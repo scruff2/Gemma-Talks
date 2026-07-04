@@ -1,24 +1,58 @@
-# Local Gemma Voice Chat
+# Gemma Talks
 
-Local voice chat for Gemma 4 E4B through `llama.cpp` / `llama-server`.
+Gemma Talks is a local browser-based voice assistant for Google Gemma 4 E4B. It runs the language model through `llama.cpp` / `llama-server`, uses Faster-Whisper for local speech recognition, speaks responses with the browser text-to-speech engine, and adds local tools for timers, weather, wake-word conversation, and proactive conversation starts.
+
+The app is designed for Windows and local use. The default configuration keeps both Gemma and Faster-Whisper on the GPU when the machine has enough VRAM.
+
+## Current Capabilities
+
+- Talk to Gemma from the browser by push-to-talk or wake word.
+- Wake word defaults to `alexa`.
+- After wake activation, follow-up conversation turns do not require repeating the wake word.
+- Conversation mode exits by voice command, mic pause, mode switch, timeout, or timer completion.
+- Set, list, and cancel multiple timers.
+- Interpret timer requests with Gemma instead of deterministic text parsing.
+- Fetch local weather from browser geolocation.
+- Fetch weather for named cities and places.
+- Give Gemma the current date, time, and weather context.
+- Rephrase weather tool results into short conversational answers.
+- Show raw Gemma responses in a dedicated UI card for debugging.
+- Show speech detection status and proactive conversation countdown.
+- Capture ambient speech after the first non-wake speech trigger, show the rolling context text, and use it to start a proactive conversation after a short delay.
+- Log transcription, weather, timer, and Gemma timing details for troubleshooting.
+
+## Architecture
+
+- Frontend: static HTML, CSS, and JavaScript in `app/static`.
+- Backend: FastAPI in `app/main.py`.
+- Language model: `llama-server.exe` from `llama.cpp`.
+- Speech recognition: Faster-Whisper.
+- Text to speech: browser speech synthesis.
+- Local timers: browser `localStorage` plus JavaScript timers.
+- Local weather: National Weather Service endpoint using browser latitude/longitude.
+- City weather lookup: Open-Meteo geocoding and forecast API.
 
 ## Prerequisites
 
+- Windows
 - Python 3.11 recommended
+- A CUDA-capable GPU for the default GPU configuration
 - `tools\llama-cpp\llama-server.exe`
-- Google Gemma 4 E4B GGUF access through Hugging Face
+- Access to the Gemma 4 E4B GGUF model on Hugging Face
 
-The checked-in start script expects the CUDA Windows build of `llama.cpp` under:
+The start script expects the CUDA Windows build of `llama.cpp` here:
 
 ```text
 tools\llama-cpp\llama-server.exe
 ```
 
-The first model start may download the default GGUF into the Hugging Face cache:
+The default model is:
 
 ```text
 google/gemma-4-E4B-it-qat-q4_0-gguf:Q4_0
 ```
+
+The model may be downloaded into the Hugging Face cache the first time `llama-server` starts.
 
 ## Setup
 
@@ -29,7 +63,17 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+Download or build `llama-server.exe` separately and place it under:
+
+```text
+tools\llama-cpp\
+```
+
+The `tools` directory is intentionally ignored by Git because it contains local binaries.
+
 ## Run
+
+Start the server:
 
 ```powershell
 .\start-server.cmd
@@ -41,26 +85,118 @@ Open:
 http://127.0.0.1:7860
 ```
 
-On Windows, use `start-server.cmd` and `stop-server.cmd` in the project root. The start script launches `llama-server` first, then the FastAPI app. The stop script shuts down both processes using `llama-server.pid` and `server.pid`.
+Stop the server:
 
-## Controls
+```powershell
+.\stop-server.cmd
+```
 
-- `REC`: start recording. Click `STOP` to end manually.
-- Auto-stop on silence: when enabled, recording stops after you pause.
-- `Stop`: cancels current speech and aborts an in-progress Gemma reply.
-- `Settings`: tune silence detection, response temperature, TTS voice, and system prompt.
-- `Transcription`: uses the configured Faster-Whisper model. The default is `medium.en`.
-- `Mic On` / `Mic Paused`: temporarily disables microphone activation.
-- Gemma timing is logged after each response: first token and complete response time.
-- Stop-intent classification only runs for stop-like phrases; ordinary follow-ups go straight to Gemma.
-- Activation mode can be `Push to talk` or `Wake word`.
-- Wake-word mode uses the fast Whisper model on short overlapping local audio windows, then matches configured wake phrases such as `alexa`.
-- You can say the wake phrase alone, or include a command in the same utterance, such as `Alexa, set a timer for three minutes`.
-- In conversation mode, follow-up turns do not require the wake word.
-- Conversation mode exits when you say `stop listening`, pause the mic, switch modes, or hit the conversation timeout.
-- In conversation mode, Gemma also classifies broad stop-like phrases before normal chat and can return the app to wake-word standby.
+`start-server.cmd` launches `llama-server` first, then the FastAPI app. `stop-server.cmd` shuts down both processes using `llama-server.pid` and `server.pid`.
 
-Local app-control commands are handled without sending them to Gemma:
+## Browser Permissions
+
+The app needs microphone permission for speech recognition.
+
+For local weather, the browser also asks for location permission. If location permission is denied, Gemma can still answer weather requests for named cities, but local “weather here” context will not be available.
+
+## Voice Workflow
+
+Activation modes:
+
+- Push to talk: click `REC`, speak, and pause or click `STOP`.
+- Wake word: say `Alexa` or a configured wake phrase.
+
+Wake-word examples:
+
+- `Alexa, can you hear me?`
+- `Alexa, set a tea timer for four minutes`
+- `Alexa, what is the weather in Phoenix, Arizona?`
+
+In wake-word mode, the wake phrase starts a conversation. Follow-up turns continue without repeating the wake word until the conversation ends.
+
+Conversation mode can end when:
+
+- You say `stop listening`, `we are done`, `that is all`, or similar stop phrases.
+- The conversation timeout is reached.
+- You pause the microphone.
+- You switch activation modes.
+- A timer is created and the app returns to wake-word listening.
+
+## Proactive Conversation
+
+When non-wake speech is detected in wake-word mode, the app starts a proactive conversation countdown. The delay is currently randomized between 30 and 60 seconds.
+
+While the countdown runs:
+
+- Faster-Whisper keeps a rolling ambient audio buffer.
+- The app re-transcribes that buffer periodically.
+- The webpage shows the `Conversation context` text that will be sent to Gemma.
+- Gemma is not called until the countdown reaches zero.
+
+When the countdown fires, Gemma receives the captured context and starts a short conversation related to it when possible.
+
+If the wake word is detected before the countdown fires, the proactive countdown is canceled and normal wake-word interaction takes over.
+
+## Timers
+
+Timer setup and cancellation are interpreted by Gemma through a strict JSON response schema, then validated by the app.
+
+Examples:
+
+- `set a timer for 10 minutes`
+- `set a tea timer for 4 minutes`
+- `set a cake timer for 30 seconds`
+- `remind me in 5 minutes`
+- `cancel the tea timer`
+- `cancel all timers`
+- `list timers`
+
+Timer notes:
+
+- Multiple active timers are supported.
+- Timers are stored in browser `localStorage`.
+- The app speaks when a timer expires.
+- Once a timer is created, conversation mode ends and wake-word listening resumes.
+
+## Weather
+
+Weather requests use live weather tools instead of relying on model memory.
+
+Supported examples:
+
+- `What is the weather right now?`
+- `What is tomorrow's high here?`
+- `What is the forecast in Chicago tomorrow?`
+- `What is the humidity in Renton, Washington?`
+- `How about Sunday?`
+
+Weather flow:
+
+1. Gemma classifies the request as `get_weather` and chooses a location.
+2. The app fetches current weather and forecast data.
+3. Gemma rephrases the factual tool output into a concise conversational answer.
+4. The app speaks and displays the answer.
+
+For local weather, the app uses browser geolocation and the National Weather Service. For named city lookup, it uses Open-Meteo geocoding and forecast data.
+
+## Interface
+
+Main UI elements:
+
+- `REC` / `STOP`: manual recording control.
+- `Speak`: toggles spoken responses.
+- `Settings`: opens voice and model settings.
+- `Mic On` / `Mic Paused`: controls microphone activation.
+- `Restart LLM`: restarts the local model server.
+- `Clear`: clears the visible chat.
+- Timers panel: shows active timers and lets you clear them.
+- Gemma Raw Response card: shows up to 500 characters of the raw model response.
+- Speech status: shows whether speech is detected.
+- Conversation countdown and context: show proactive conversation timing and the text Gemma will analyze.
+
+## Local App Commands
+
+These are handled locally where possible:
 
 - `stop`
 - `clear chat`
@@ -75,18 +211,6 @@ Local app-control commands are handled without sending them to Gemma:
 - `push to talk mode`
 - `stop listening`
 
-Timer examples:
-
-- `set a timer for 10 minutes`
-- `set a timer for 1 hour 30 minutes`
-- `remind me in 5 minutes`
-- `set a tea timer for 4 minutes`
-- `list timers`
-- `cancel timer`
-- `clear timers`
-
-Timer setup phrases are interpreted by Gemma as strict JSON, then the app validates the returned timer parameters and schedules the timer locally. The app does not parse timer wording directly. If Gemma decides a timer request is missing a duration, the app asks for the missing time and sends the next reply back to Gemma with timer context. Timers are stored in browser localStorage and the app speaks when a timer expires. Once a timer is created, the conversation ends and wake-word listening resumes.
-
 ## Configuration
 
 Optional environment variables:
@@ -100,24 +224,64 @@ $env:WHISPER_FAST_MODEL = "medium.en"
 $env:WHISPER_WAKE_MODEL = "medium.en"
 $env:WHISPER_DEVICE = "cuda"
 $env:WHISPER_COMPUTE_TYPE = "float16"
+$env:WHISPER_BEAM_SIZE = "3"
 $env:WAKE_WORDS = "alexa,computer"
 $env:WAKE_SENSITIVITY = "0.45"
+$env:WAKE_AMBIENT_CONTEXT_SECONDS = "2.5"
+$env:WAKE_AMBIENT_PRETRIGGER_SECONDS = "6.0"
+$env:WAKE_AMBIENT_MAX_SECONDS = "70.0"
 ```
 
 If GPU memory is tight, try:
 
 ```powershell
 $env:WHISPER_MODEL = "base.en"
+$env:WHISPER_FAST_MODEL = "base.en"
+$env:WHISPER_WAKE_MODEL = "base.en"
 $env:WHISPER_DEVICE = "cpu"
 $env:WHISPER_COMPUTE_TYPE = "int8"
 ```
 
-If CUDA dependencies are not installed or GPU memory is tight, keep Whisper on CPU and leave the GPU for `llama-server`.
-
-To fall back to Ollama, set these before running `start-server.cmd`:
+To fall back to Ollama:
 
 ```powershell
 $env:LLM_PROVIDER = "ollama"
 $env:OLLAMA_URL = "http://localhost:11434"
 $env:OLLAMA_MODEL = "gemma4:e4b"
 ```
+
+The current project default is `llama-server`, because it was faster and more reliable than the Ollama setup used earlier in development.
+
+## Logs And Runtime Files
+
+Runtime logs and PID files are created locally and ignored by Git:
+
+- `app/voice-app.log`
+- `server.out.log`
+- `server.err.log`
+- `server.pid`
+- `llama-server.out.log`
+- `llama-server.err.log`
+- `llama-server.pid`
+
+These logs are useful for diagnosing:
+
+- speech transcription time
+- wake listener behavior
+- proactive context capture
+- Gemma intent classification
+- weather tool calls
+- first-token and full-response timing
+
+## Repository Notes
+
+This repository does not include:
+
+- Python virtual environment files
+- `llama.cpp` binaries
+- downloaded model files
+- local logs
+- local PID files
+- local session resume files
+
+Those are machine-local runtime artifacts and should be recreated during setup.
