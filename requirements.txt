@@ -4,3 +4,5 @@ python-multipart==0.0.20
 httpx==0.28.1
 faster-whisper==1.2.1
 numpy==2.4.6
+sounddevice==0.5.3
+websockets>=15,<17

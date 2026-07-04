@@ -6,15 +6,21 @@ cd /d "%~dp0"
 set "PID_FILE=%CD%\server.pid"
 
 if not exist "%PID_FILE%" (
-  echo No server.pid file found. Nothing to stop.
+  echo No server.pid file found. Looking for server on port 7860.
+  powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$existing = Get-NetTCPConnection -LocalPort 7860 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1;" ^
+    "if ($existing) { Stop-Process -Id $existing.OwningProcess -Force; Write-Host ('Stopped server PID ' + $existing.OwningProcess) } else { Write-Host 'No server process found.' }"
   call "%CD%\stop-llama-server.cmd" >nul 2>nul
   exit /b 0
 )
 
 set /p SERVER_PID=<"%PID_FILE%"
 if "%SERVER_PID%"=="" (
-  echo server.pid is empty. Removing stale file.
+  echo server.pid is empty. Looking for server on port 7860.
   del /f /q "%PID_FILE%" >nul 2>nul
+  powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$existing = Get-NetTCPConnection -LocalPort 7860 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1;" ^
+    "if ($existing) { Stop-Process -Id $existing.OwningProcess -Force; Write-Host ('Stopped server PID ' + $existing.OwningProcess) } else { Write-Host 'No server process found.' }"
   call "%CD%\stop-llama-server.cmd" >nul 2>nul
   exit /b 0
 )

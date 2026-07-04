@@ -3,7 +3,9 @@ setlocal
 
 cd /d "%~dp0"
 
-set "PYTHON_EXE=%CD%\.venv\Scripts\python.exe"
+set "PYTHON_EXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+if not exist "%PYTHON_EXE%" set "PYTHON_EXE=%CD%\.venv\Scripts\python.exe"
+set "PYTHONPATH_VALUE=%CD%\.venv\Lib\site-packages;%CD%"
 set "PID_FILE=%CD%\server.pid"
 set "OUT_LOG=%CD%\server.out.log"
 set "ERR_LOG=%CD%\server.err.log"
@@ -32,13 +34,21 @@ if /I "%LLM_PROVIDER%"=="llama" (
 
 if exist "%PID_FILE%" (
   set /p EXISTING_PID=<"%PID_FILE%"
-  tasklist /FI "PID eq %EXISTING_PID%" /NH | findstr /I "python.exe" >nul
-  if not errorlevel 1 (
-    echo Server already appears to be running with PID %EXISTING_PID%.
-    exit /b 0
+  if not "%EXISTING_PID%"=="" (
+    tasklist /FI "PID eq %EXISTING_PID%" /NH | findstr /I "python.exe" >nul
+    if not errorlevel 1 (
+      echo Server already appears to be running with PID %EXISTING_PID%.
+      exit /b 0
+    )
   )
   del /f /q "%PID_FILE%" >nul 2>nul
 )
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$existing = Get-NetTCPConnection -LocalPort 7860 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1;" ^
+  "if ($existing) { Set-Content -LiteralPath '%PID_FILE%' -Value $existing.OwningProcess; Write-Host ('Server already listening. PID=' + $existing.OwningProcess); exit 10 }"
+if errorlevel 10 exit /b 0
+if errorlevel 1 exit /b 1
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$workdir = '%CD%';" ^
@@ -54,7 +64,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$env:WHISPER_DEVICE = '%WHISPER_DEVICE%';" ^
   "$env:WHISPER_COMPUTE_TYPE = '%WHISPER_COMPUTE_TYPE%';" ^
   "$env:WHISPER_BEAM_SIZE = '%WHISPER_BEAM_SIZE%';" ^
-  "$env:PATH = '%LLAMA_CPP_DIR%;' + $env:PATH;" ^
+  "$env:PYTHONPATH = '%PYTHONPATH_VALUE%';" ^
+  "$pathValue = [Environment]::GetEnvironmentVariable('Path','Process'); if (-not $pathValue) { $pathValue = [Environment]::GetEnvironmentVariable('PATH','Process') };" ^
+  "[Environment]::SetEnvironmentVariable('PATH',$null,'Process'); [Environment]::SetEnvironmentVariable('Path',('%CD%\.venv\Scripts;%LLAMA_CPP_DIR%;' + $pathValue),'Process');" ^
   "$p = Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList @('-u','-m','uvicorn','app.main:app','--host','127.0.0.1','--port','7860') -WorkingDirectory $workdir -RedirectStandardOutput $out -RedirectStandardError $err -PassThru;" ^
   "Set-Content -LiteralPath '%PID_FILE%' -Value $p.Id;" ^
   "Write-Host ('Server started. PID=' + $p.Id)"

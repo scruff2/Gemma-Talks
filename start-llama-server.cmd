@@ -14,6 +14,8 @@ if not exist "%LLAMA_EXE%" (
 )
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$pathValue = [Environment]::GetEnvironmentVariable('Path','Process'); if (-not $pathValue) { $pathValue = [Environment]::GetEnvironmentVariable('PATH','Process') };" ^
+  "[Environment]::SetEnvironmentVariable('PATH',$null,'Process'); [Environment]::SetEnvironmentVariable('Path',$pathValue,'Process');" ^
   "$exe = (Resolve-Path -LiteralPath '%LLAMA_EXE%').Path;" ^
   "$pidFile = '%PID_FILE%';" ^
   "$existing = Get-Process -Name 'llama-server' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } | Select-Object -First 1;" ^
@@ -25,6 +27,8 @@ if errorlevel 1 exit /b 1
 if "%LLAMA_MODEL%"=="" set "LLAMA_MODEL=google/gemma-4-E4B-it-qat-q4_0-gguf:Q4_0"
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$pathValue = [Environment]::GetEnvironmentVariable('Path','Process'); if (-not $pathValue) { $pathValue = [Environment]::GetEnvironmentVariable('PATH','Process') };" ^
+  "[Environment]::SetEnvironmentVariable('PATH',$null,'Process'); [Environment]::SetEnvironmentVariable('Path',$pathValue,'Process');" ^
   "$workdir = '%CD%';" ^
   "$exe = '%LLAMA_EXE%';" ^
   "$out = '%OUT_LOG%';" ^
