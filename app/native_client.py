@@ -42,10 +42,18 @@ SYSTEM_PROMPT = os.getenv(
 TEMPERATURE = float(os.getenv("GEMMA_TALKS_TEMPERATURE", "0.7"))
 LOCAL_WEATHER_LOCATION = os.getenv("GEMMA_TALKS_WEATHER_LOCATION", "").strip()
 PID_FILE = os.getenv("GEMMA_TALKS_NATIVE_PID_FILE", "").strip()
+LOG_FILE = os.getenv("GEMMA_TALKS_NATIVE_LOG_FILE", "").strip()
 
 
 def log(message: str) -> None:
-    print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}", flush=True)
+    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}"
+    print(line, flush=True)
+    if LOG_FILE:
+        try:
+            with open(LOG_FILE, "a", encoding="utf-8") as file:
+                file.write(line + "\n")
+        except OSError:
+            pass
 
 
 def write_pid_file() -> None:
