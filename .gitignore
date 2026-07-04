@@ -7,6 +7,7 @@ __pycache__/
 uploads/
 *.log
 *.pid
+*.pid.lock
 tools/
 .agents/
 .codex/

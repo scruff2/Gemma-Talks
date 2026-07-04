@@ -43,6 +43,10 @@ TEMPERATURE = float(os.getenv("GEMMA_TALKS_TEMPERATURE", "0.7"))
 LOCAL_WEATHER_LOCATION = os.getenv("GEMMA_TALKS_WEATHER_LOCATION", "").strip()
 PID_FILE = os.getenv("GEMMA_TALKS_NATIVE_PID_FILE", "").strip()
 LOG_FILE = os.getenv("GEMMA_TALKS_NATIVE_LOG_FILE", "").strip()
+LOCK_FILE = os.getenv("GEMMA_TALKS_NATIVE_LOCK_FILE", "").strip() or (
+    f"{PID_FILE}.lock" if PID_FILE else ""
+)
+_LOCK_HANDLE: Any | None = None
 
 
 def log(message: str) -> None:
@@ -77,6 +81,47 @@ def remove_pid_file() -> None:
                 os.remove(PID_FILE)
     except OSError as exc:
         log(f"could not remove pid file: {exc}")
+
+
+def acquire_single_instance_lock() -> bool:
+    global _LOCK_HANDLE
+    if not LOCK_FILE or sys.platform != "win32":
+        return True
+    try:
+        import msvcrt
+
+        lock_dir = os.path.dirname(LOCK_FILE)
+        if lock_dir:
+            os.makedirs(lock_dir, exist_ok=True)
+        handle = open(LOCK_FILE, "a+", encoding="utf-8")
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        handle.seek(0)
+        handle.truncate()
+        handle.write(str(os.getpid()))
+        handle.flush()
+        _LOCK_HANDLE = handle
+        return True
+    except OSError:
+        log("another native listener is already running")
+        return False
+
+
+def release_single_instance_lock() -> None:
+    global _LOCK_HANDLE
+    if not _LOCK_HANDLE:
+        return
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            _LOCK_HANDLE.seek(0)
+            msvcrt.locking(_LOCK_HANDLE.fileno(), msvcrt.LK_UNLCK, 1)
+        _LOCK_HANDLE.close()
+        with contextlib.suppress(OSError):
+            os.remove(LOCK_FILE)
+    finally:
+        _LOCK_HANDLE = None
 
 
 def audio_rms(samples: np.ndarray) -> float:
@@ -530,6 +575,8 @@ class NativeVoiceClient:
 
 
 async def async_main() -> int:
+    if not acquire_single_instance_lock():
+        return 2
     client = NativeVoiceClient()
     write_pid_file()
 
@@ -546,6 +593,7 @@ async def async_main() -> int:
     finally:
         await client.close()
         remove_pid_file()
+        release_single_instance_lock()
     return 0
 
 

@@ -41,6 +41,12 @@ echo.
 "%PYTHON_EXE%" -u -m app.native_client
 set EXIT_CODE=%ERRORLEVEL%
 
+if "%EXIT_CODE%"=="2" (
+  echo Another native listener is already running.
+  timeout /t 2 >nul
+  exit /b 2
+)
+
 echo.
 echo Gemma Talks native listener exited with code %EXIT_CODE%.
 pause
