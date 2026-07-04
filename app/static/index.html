@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gemma Voice</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <h1>Gemma Voice</h1>
+          <p id="status">Starting...</p>
+          <div id="speechIndicator" class="speech-indicator" aria-live="polite">
+            <span class="speech-status-line">
+              <span class="speech-dot" aria-hidden="true"></span>
+              <span id="speechIndicatorText">No speech detected</span>
+            </span>
+            <span id="proactiveNudgeText" class="proactive-nudge-text"></span>
+            <div id="proactiveContextPanel" class="proactive-context-panel" hidden>
+              <div class="proactive-context-label">Conversation context</div>
+              <div id="proactiveContextText" class="proactive-context-text"></div>
+            </div>
+          </div>
+        </div>
+        <div class="controls">
+          <label class="toggle">
+            <input id="speakToggle" type="checkbox" checked />
+            <span>Speak</span>
+          </label>
+          <button id="settingsButton" type="button" title="Settings">Settings</button>
+          <button id="micPauseButton" type="button" title="Pause microphone">Mic On</button>
+          <button id="stopButton" type="button" title="Stop output">Stop</button>
+          <button id="restartOllamaButton" type="button" class="danger" title="Restart LLM">Restart LLM</button>
+          <button id="clearButton" type="button" title="Clear chat">Clear</button>
+        </div>
+      </section>
+
+      <section id="settingsPanel" class="settings" hidden>
+        <div class="settings-grid">
+          <label class="toggle">
+            <input id="autoStopToggle" type="checkbox" checked />
+            <span>Auto-stop on silence</span>
+          </label>
+          <label>
+            <span>Silence threshold</span>
+            <input id="silenceThresholdInput" type="range" min="1" max="12" step="1" />
+          </label>
+          <label>
+            <span>Silence delay</span>
+            <select id="silenceDelayInput">
+              <option value="800">0.8 sec</option>
+              <option value="1200">1.2 sec</option>
+              <option value="1600">1.6 sec</option>
+              <option value="2200">2.2 sec</option>
+            </select>
+          </label>
+          <label>
+            <span>Activation</span>
+            <select id="activationModeInput">
+              <option value="pushToTalk">Push to talk</option>
+              <option value="wakeWord">Wake word</option>
+            </select>
+          </label>
+          <label>
+            <span>Wake sensitivity</span>
+            <input id="wakeThresholdInput" type="range" min="0.2" max="0.9" step="0.05" />
+          </label>
+          <label>
+            <span>Conversation timeout</span>
+            <select id="conversationTimeoutInput">
+              <option value="10">10 sec</option>
+              <option value="20">20 sec</option>
+              <option value="45">45 sec</option>
+              <option value="60">60 sec</option>
+              <option value="120">2 min</option>
+            </select>
+          </label>
+          <label>
+            <span>Transcription</span>
+            <select id="transcriptionModeInput">
+              <option value="fast">Fast</option>
+              <option value="balanced">Balanced</option>
+            </select>
+          </label>
+          <label>
+            <span>Temperature</span>
+            <input id="temperatureInput" type="range" min="0" max="1.2" step="0.1" />
+          </label>
+          <label>
+            <span>Voice</span>
+            <select id="voiceSelect"></select>
+          </label>
+          <label class="wide">
+            <span>System prompt</span>
+            <textarea id="systemPromptInput" rows="3"></textarea>
+          </label>
+          <div class="wide settings-actions">
+            <button id="resetPromptButton" type="button">Reset Prompt</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="timersPanel" class="timers">
+        <div class="timers-header">
+          <div>
+            <h2>Timers</h2>
+            <p id="timersStatus">No active timers.</p>
+          </div>
+          <button id="clearTimersButton" type="button" title="Clear all timers">Clear All</button>
+        </div>
+        <div id="timersList" class="timers-list"></div>
+      </section>
+
+      <section class="raw-response-card" aria-label="Gemma raw response">
+        <div class="raw-response-header">
+          <h2>Gemma Raw Response</h2>
+          <p>Latest response, capped at 500 characters.</p>
+        </div>
+        <pre id="rawResponseOutput" class="raw-response-output">No raw response yet.</pre>
+      </section>
+
+      <section id="chat" class="chat" aria-live="polite"></section>
+
+      <section class="composer">
+        <button id="recordButton" class="record" type="button" title="Record voice">
+          <span id="recordIcon">REC</span>
+        </button>
+        <textarea id="promptInput" rows="2" placeholder="Speak or type a message"></textarea>
+        <button id="sendButton" type="button">Send</button>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

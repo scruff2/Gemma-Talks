@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.*
+uploads/
+*.log
+*.pid
+tools/
+.agents/
+.codex/
+Session_ID.txt
+Session_Resume.cmd
