@@ -41,10 +41,34 @@ SYSTEM_PROMPT = os.getenv(
 )
 TEMPERATURE = float(os.getenv("GEMMA_TALKS_TEMPERATURE", "0.7"))
 LOCAL_WEATHER_LOCATION = os.getenv("GEMMA_TALKS_WEATHER_LOCATION", "").strip()
+PID_FILE = os.getenv("GEMMA_TALKS_NATIVE_PID_FILE", "").strip()
 
 
 def log(message: str) -> None:
     print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}", flush=True)
+
+
+def write_pid_file() -> None:
+    if not PID_FILE:
+        return
+    try:
+        with open(PID_FILE, "w", encoding="utf-8") as file:
+            file.write(str(os.getpid()))
+    except OSError as exc:
+        log(f"could not write pid file: {exc}")
+
+
+def remove_pid_file() -> None:
+    if not PID_FILE:
+        return
+    try:
+        if os.path.exists(PID_FILE):
+            with open(PID_FILE, encoding="utf-8") as file:
+                existing = file.read().strip()
+            if existing == str(os.getpid()):
+                os.remove(PID_FILE)
+    except OSError as exc:
+        log(f"could not remove pid file: {exc}")
 
 
 def audio_rms(samples: np.ndarray) -> float:
@@ -499,6 +523,7 @@ class NativeVoiceClient:
 
 async def async_main() -> int:
     client = NativeVoiceClient()
+    write_pid_file()
 
     def stop() -> None:
         client.running = False
@@ -512,6 +537,7 @@ async def async_main() -> int:
         await client.run()
     finally:
         await client.close()
+        remove_pid_file()
     return 0
 
 

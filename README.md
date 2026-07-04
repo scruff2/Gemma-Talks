@@ -114,11 +114,11 @@ Stop it:
 .\stop-native-client.cmd
 ```
 
-Start the backend first with `start-server.cmd`, then run `start-native-client.cmd`. The native launcher verifies the backend health endpoint and launches `app.native_client` as a hidden Windows process. It writes:
+Start the backend first with `start-server.cmd`, then run `start-native-client.cmd`. The native launcher verifies the backend health endpoint and opens a separate `Gemma Talks Native Listener` console window. You can minimize that window, but leave it open while you want non-browser listening.
+
+The native client writes:
 
 - `native-client.pid`
-- `native-client.out.log`
-- `native-client.err.log`
 
 The native client currently supports:
 
@@ -318,8 +318,6 @@ Runtime logs and PID files are created locally and ignored by Git:
 - `llama-server.out.log`
 - `llama-server.err.log`
 - `llama-server.pid`
-- `native-client.out.log`
-- `native-client.err.log`
 - `native-client.pid`
 
 These logs are useful for diagnosing:
