@@ -159,6 +159,27 @@ def merge_prefill(prefix: str, transcript: str) -> str:
     return f"{clean_prefix.rstrip(' .,!?:;-')} {clean_transcript}".strip()
 
 
+def resolve_weather_location(location: str) -> str:
+    clean = " ".join((location or "").split()).strip()
+    normalized = normalize_text(clean)
+    local_aliases = {
+        "",
+        "here",
+        "outside",
+        "nearby",
+        "local",
+        "locally",
+        "my location",
+        "current location",
+        "your current location",
+        "my current location",
+        "this location",
+    }
+    if normalized in local_aliases or "current location" in normalized:
+        return LOCAL_WEATHER_LOCATION
+    return clean
+
+
 def powershell_speak(text: str) -> None:
     spoken = " ".join((text or "").split()).strip()
     if not spoken:
@@ -233,6 +254,7 @@ class NativeVoiceClient:
             data = response.json()
             self.weather_context = str(data.get("summary") or "")
             self.weather_fetched_at = time.time()
+            log(f"weather context loaded for {LOCAL_WEATHER_LOCATION}")
         except Exception as exc:
             await self.client_log("native_weather_context", decision="unavailable", detail=str(exc))
         return self.weather_context
@@ -455,13 +477,15 @@ class NativeVoiceClient:
             return False
 
         if intent == "get_weather":
-            location = str(result.get("weather_location") or "").strip()
+            location = resolve_weather_location(str(result.get("weather_location") or ""))
             if location:
                 try:
                     spoken = await self.weather_reply(user_text, location)
                 except Exception as exc:
                     spoken = f"I could not get weather for {location}."
                     await self.client_log("native_weather_lookup", user_text, "failed", str(exc))
+            else:
+                spoken = "I do not have a local weather location configured."
             self.pending_timer_setup = None
 
         if intent == "end_conversation":

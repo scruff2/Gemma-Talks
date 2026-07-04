@@ -7,6 +7,7 @@ set "PYTHON_EXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
 if not exist "%PYTHON_EXE%" set "PYTHON_EXE=%CD%\.venv\Scripts\python.exe"
 
 if "%GEMMA_TALKS_URL%"=="" set "GEMMA_TALKS_URL=http://127.0.0.1:7860"
+if "%GEMMA_TALKS_WEATHER_LOCATION%"=="" set "GEMMA_TALKS_WEATHER_LOCATION=Renton, WA"
 set "GEMMA_TALKS_NATIVE_PID_FILE=%CD%\native-client.pid"
 set "GEMMA_TALKS_NATIVE_LOG_FILE=%CD%\native-client.out.log"
 set "PYTHONPATH=%CD%\.venv\Lib\site-packages;%CD%"

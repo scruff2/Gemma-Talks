@@ -761,6 +761,37 @@ def weather_location_from_checking_spoken(spoken: str) -> str:
     return " ".join(location.split()).strip(" ,.;:")[:160]
 
 
+def text_asks_for_weather(text: str) -> bool:
+    normalized = " ".join((text or "").lower().split())
+    if not normalized:
+        return False
+    weather_terms = {
+        "weather",
+        "forecast",
+        "temperature",
+        "temp",
+        "humidity",
+        "humid",
+        "rain",
+        "raining",
+        "snow",
+        "snowing",
+        "wind",
+        "windy",
+        "hot",
+        "cold",
+    }
+    if any(re.search(rf"\b{re.escape(term)}\b", normalized) for term in weather_terms):
+        return True
+    return bool(
+        re.search(
+            r"\b(today|tomorrow|tonight|outside|out)\b.*\b(high|low|warm|cool|cold|hot)\b"
+            r"|\b(high|low|warm|cool|cold|hot)\b.*\b(today|tomorrow|tonight|outside|out)\b",
+            normalized,
+        )
+    )
+
+
 class ClientLogRequest(BaseModel):
     event: str
     text: str = ""
@@ -2289,7 +2320,7 @@ async def assistant_turn(request: AssistantTurnRequest) -> AssistantTurnResponse
         data["reason"] = (
             f"{reason}; recovered plain weather tool request".strip("; ")
         )
-    elif intent == "chat" and weather_location:
+    elif intent == "chat" and weather_location and text_asks_for_weather(text):
         intent = "get_weather"
         data["reason"] = (
             f"{str(data.get('reason', '') or '')}; recovered weather location".strip("; ")
